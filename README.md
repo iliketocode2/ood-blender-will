@@ -8,3 +8,4 @@ Open OnDemand app to render animations using Blender on a HPC cluster using GPUs
 - Allows selection of frames to render
 - Automatically blocks multiple renderers and cleans up failed frame files
 - Supports GPU Model, Parition and QOS selection
+- Detects and warns about Out of Memory (OOM) errors
