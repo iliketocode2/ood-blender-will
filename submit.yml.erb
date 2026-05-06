@@ -1,0 +1,19 @@
+batch_connect:
+  template: "basic"
+
+script:
+  job_name: "Blender_renderer"
+  native:
+    - "--nodes=<%=bc_num_slots %>"
+    - "--gres=gpu:<%=gpu_count %>"
+    - "--ntasks=<%=bc_num_slots.to_i  * gpu_count.to_i  %>"
+    - "--constraint=<%=gpu_type %>"
+    - "--partition=<%=partition %>"
+    - "--mem=<%=num_memory %>G"
+    - "--cpus-per-task=<%=num_cores %>"
+    - "--gpus-per-task=1"
+    - "--time=0<%=bc_num_hours %>:00:00"
+    - "--error=output.err"
+<% if ta_qos %>
+    - "--qos=<%=ta_qos %>"
+<% end %>

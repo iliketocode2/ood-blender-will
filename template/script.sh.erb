@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+#set -euo pipefail
+
+module load modtree/deprecated
+module load blender/4.2.5
+module load cuda/11.7
+
+hostname
+pwd
+
+if [ -z "$OUTPUT_DIR" ]; then
+  echo "Error: OUTPUT_DIR is empty or unset."
+  exit 1 # Exit with a non-zero status to indicate an error
+fi
+
+echo "Rendering files to output directory: $OUTPUT_DIR"
+
+echo "Job ${SLURM_JOB_ID} starting on ${SLURM_JOB_NODELIST}"
+echo "Nodes: ${SLURM_JOB_NUM_NODES}, Tasks: ${SLURM_NTASKS}, GPUs/task: 1"
+echo "Blend: ${BLENDER_PROJECT}"
+echo "OutputDir:  ${OUTPUT_DIR}"
+echo "START_FRAME:  ${START_FRAME_GLOBAL}"
+echo "TOTAL_FRAMES:  ${TOTAL_FRAMES}"
+echo "FRAMES_PER_TASK:  ${FRAMES_PER_TASK}"
+
+#Create output directory 
+mkdir -p "$OUTPUT_DIR"
+
+#render all frames, skipping existing frames (-a)
+#https://docs.blender.org/manual/en/latest/advanced/command_line/arguments.html
+#     --output="slurm-%x_%j_%n_task%t.out" \
+
+# One srun spanning both nodes. Each rank renders a different frame range.
+srun --export=ALL \
+     --ntasks=${SLURM_NTASKS} \
+     --cpus-per-task=${SLURM_CPUS_PER_TASK} \
+     --gpu-bind=single:1 \
+     /bin/bash -c '
+       #set -euo pipefail
+
+       # Rank id 0..7
+       RANK=${SLURM_PROCID}
+
+       FRAMES_PER_TASK='"${FRAMES_PER_TASK}"'
+       START_FRAME_GLOBAL='"${START_FRAME_GLOBAL}"'
+
+       START=$(( START_FRAME_GLOBAL + RANK * FRAMES_PER_TASK ))
+       END=$(( START + FRAMES_PER_TASK - 1 ))
+
+       echo "Rank ${RANK} on $(hostname)"
+       echo "  CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
+       blender -b "'"${BLENDER_PROJECT}"'" \
+               -P ./use_gpu.py \
+               -E CYCLES \
+               --render-output "'"${OUTPUT_DIR}/######"'" \
+               --render-format PNG\
+               -s "${START}" -e "${END}" -a
+     '
+
+
+echo "Exited.  End of job ${SLURM_JOB_ID}."
+echo "Output at: ${OUTPUT_DIR}"
